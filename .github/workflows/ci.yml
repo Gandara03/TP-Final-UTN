@@ -1,0 +1,31 @@
+# Compila y corre los tests de los microservicios en cada push y pull request.
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        servicio: [ config-server, eureka-server, product-service, customer-service ]
+    defaults:
+      run:
+        working-directory: ${{ matrix.servicio }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # los tests usan H2 en memoria: no necesitan MySQL, Eureka ni el Config Server
+      - name: Compilar y testear
+        run: mvn -B -ntp verify

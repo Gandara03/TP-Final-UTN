@@ -67,6 +67,7 @@ En el proyecto de cada servicio solo queda el nombre y la direccion del Config S
 - Cada servicio tiene su propia base de datos. Un producto guarda solo el `clienteId`: no hay relacion entre tablas de distintos servicios.
 - Las entidades nunca salen por la API. Todo entra y sale como DTO y los mappers hacen la conversion.
 - Las passwords y la clave del JWT no estan escritas en el repo: se leen de variables de entorno (ver mas abajo).
+- `product-service` no tiene seguridad propia: se lo piensa como un servicio interno, al que solo llama `customer-service`. En un despliegue real no se expondria afuera (quedaria detras de un API Gateway o en una red privada). La API publica, la de clientes, es la que esta protegida con JWT y roles.
 
 ## Estructura del repositorio
 
@@ -192,7 +193,7 @@ cd config-server
 | `admin` | `admin123` | ADMIN | consultar, crear y modificar clientes |
 | `usuario` | `usuario123` | USUARIO | solo consultar |
 
-Son usuarios de prueba que se cargan al iniciar. Para usarlos:
+Son usuarios de prueba que se cargan al iniciar, igual que la clave por defecto del JWT: sirven solo para correrlo en local. Fuera de un entorno de desarrollo hay que cambiar las passwords y definir `JWT_SECRET`. Para usarlos:
 
 1. `POST /auth/login` con `{"username": "admin", "password": "admin123"}`
 2. Copiar el `token` de la respuesta.
@@ -292,6 +293,10 @@ cd ../customer-service
 .\mvnw.cmd test
 ```
 
+## Integracion continua
+
+En `.github/workflows/ci.yml` hay un workflow de GitHub Actions que, en cada push y pull request a `main` o `develop`, compila los cuatro proyectos y corre los tests. El resultado se ve en la pestana **Actions** del repo y en cada pull request.
+
 ## Postman
 
 En `postman/TP-Final-UTN.postman_collection.json` esta la coleccion con todos los pedidos (en Postman: Import y elegir el archivo).
@@ -299,3 +304,19 @@ En `postman/TP-Final-UTN.postman_collection.json` esta la coleccion con todos lo
 - El login guarda el token solo, asi que hay que ejecutarlo primero.
 - Se puede correr entera con el Runner de Postman. La carpeta "Roles" va al final porque cambia el token por el del usuario de solo lectura.
 - Esta pensada para una base recien creada (con los datos de ejemplo). Si se corre dos veces, los altas dan 409 porque los datos ya existen.
+
+## Revision de codigo con IA
+
+Como pide la consigna, se le pidio una revision del pull request `develop -> main` a GitHub Copilot.
+
+Lo que marco y que se hizo:
+
+| Observacion de Copilot | Que se hizo |
+|---|---|
+| Correr los tests de los dos microservicios | Se corrieron: 12 en product-service y 19 en customer-service, todos OK |
+| Probar el arranque completo en orden (Config Server, Eureka, microservicios) | Se probo con MySQL y la coleccion de Postman entera (24 pedidos OK) |
+| El Config Server lee de `main`, que tiene que tener `config-repo` | Se resuelve al mergear el pull request a `main` |
+| Cambiar credenciales de prueba y secreto JWT fuera de local | Ya se leen de variables de entorno; se aclaro en la seccion Seguridad |
+| Agregar un workflow de GitHub Actions | Se agrego `.github/workflows/ci.yml` (ver Integracion continua) |
+| Las rutas de product-service son publicas | Se dejo asi a proposito y se documento en Decisiones de diseno |
+
