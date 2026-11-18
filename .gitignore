@@ -1,0 +1,21 @@
+# Maven
+target/
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+
+# Otros
+HELP.md
+*.log
+.env
+
+# TP de medio termino (tiene su propio repo)
+Tp-MedioTerminoUTN/
