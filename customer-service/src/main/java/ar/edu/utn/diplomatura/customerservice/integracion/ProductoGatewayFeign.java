@@ -26,7 +26,8 @@ public class ProductoGatewayFeign implements ProductoGateway {
         } catch (FeignException e) {
             // servicio caido, sin instancias en Eureka o error del otro lado
             throw new ServicioNoDisponibleException(
-                    "No se pudieron obtener los productos: product-service no esta disponible", e);
+                    "No se pudieron obtener los productos del cliente " + clienteId
+                            + ": product-service no esta disponible", e);
         }
     }
 }

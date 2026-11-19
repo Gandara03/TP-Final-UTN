@@ -8,19 +8,7 @@ spring:
     config:
       server:
         git:
-          # Repositorio remoto donde vive la configuracion (carpeta config-repo).
-          uri: https://github.com/Gandara03/TP-Final-UTN
-          search-paths: config-repo
+          # Repositorio remoto (aparte) donde vive la configuracion de los servicios.
+          uri: https://github.com/Gandara03/TP-Final-UTN-config
           default-label: main
           clone-on-start: true
-
----
-spring:
-  config:
-    activate:
-      on-profile: native
-  cloud:
-    config:
-      server:
-        native:
-          search-locations: file:../config-repo

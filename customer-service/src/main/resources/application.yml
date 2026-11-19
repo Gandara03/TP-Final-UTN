@@ -3,4 +3,4 @@ spring:
     # Nombre con el que se registra en Eureka y con el que pide su config (customer-service.yml).
     name: customer-service
   config:
-    import: "optional:configserver:http://localhost:8888"
+    import: "configserver:http://localhost:8888"
