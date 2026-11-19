@@ -6,25 +6,32 @@ Son cuatro proyectos Spring Boot 4.1 (Spring Cloud 2025.1, Java 21) que trabajan
 
 | Proyecto | Puerto | Para que sirve |
 |---|---|---|
-| `config-server` | 8888 | Entrega la configuracion de todos los servicios. La lee de la carpeta `config-repo` de este repositorio en GitHub. |
-| `eureka-server` | 8761 | Registro de servicios. Cada microservicio se anota aca con su nombre. |
+| `config-server` | 8888 | Entrega la configuracion de los microservicios. La lee del repositorio de configuracion en GitHub. |
+| `eureka-server` | 8761 | Registro de servicios. Cada microservicio se anota aca con su nombre. Tiene su configuracion local. |
 | `product-service` | 8082 | Productos de los clientes: cuentas, tarjetas, prestamos e inversiones. |
 | `customer-service` | 8081 | Clientes (nombre, apellido, CUIT/CUIL como documento, email y saldo). Para mostrar los productos de un cliente le pregunta a `product-service` con Feign. Tiene login con JWT. |
+
+## Repositorios
+
+| Repositorio | Que tiene |
+|---|---|
+| https://github.com/Gandara03/TP-Final-UTN | Este repo: los cuatro proyectos (config-server, eureka-server, product-service, customer-service), la coleccion de Postman y este README |
+| https://github.com/Gandara03/TP-Final-UTN-config | Repositorio de configuracion: los `.yml` que entrega el Config Server |
 
 ## Arquitectura
 
 ```
-                      GitHub (carpeta config-repo/)
+                 GitHub: repo TP-Final-UTN-config (.yml)
                                    |
                                    v
                           +-----------------+
-                          |  config-server  |   (1) los otros tres le piden
-                          |      :8888      |       su configuracion al arrancar
+                          |  config-server  |   (1) customer-service y product-service
+                          |      :8888      |       le piden su configuracion al arrancar
                           +-----------------+
 
                           +-----------------+
-                          |  eureka-server  |   (2) los dos microservicios
-                          |      :8761      |       se registran con su nombre
+                          |  eureka-server  |   (2) los dos microservicios se registran
+                          |      :8761      |       con su nombre (Eureka tiene config local)
                           +-----------------+
                               ^         ^
                    registro  /           \  registro
@@ -51,16 +58,19 @@ Ejemplo: `GET http://localhost:8081/clientes/1/productos` con un token valido.
 
 ### Como se reparte la configuracion
 
-Cada servicio, al arrancar, le pide su configuracion al Config Server usando su nombre (`spring.application.name`):
+customer-service y product-service, al arrancar, le piden su configuracion al Config Server usando su nombre (`spring.application.name`). El Config Server la lee del repo [TP-Final-UTN-config](https://github.com/Gandara03/TP-Final-UTN-config), rama `main`:
 
-| Archivo en `config-repo/` | Lo recibe | Que tiene |
+| Archivo del repo de configuracion | Lo recibe | Que tiene |
 |---|---|---|
 | `application.yml` | todos | direccion de Eureka, actuator, formato del JSON |
-| `eureka-server.yml` | eureka-server | puerto 8761 |
 | `product-service.yml` | product-service | puerto 8082, base `productos_db`, usuario y password de MySQL |
 | `customer-service.yml` | customer-service | puerto 8081, base `clientes_db`, usuario y password de MySQL, clave y duracion del JWT |
 
-En el proyecto de cada servicio solo queda el nombre y la direccion del Config Server (`localhost:8888`), que es lo minimo que necesita para saber a quien pedirle el resto.
+En el proyecto de cada microservicio solo queda el nombre y la direccion del Config Server (`spring.config.import: configserver:http://localhost:8888`). Va sin `optional:` a proposito: si el Config Server no esta levantado, el servicio no arranca y el error lo dice claramente, en vez de arrancar en el puerto 8080 sin Eureka.
+
+`eureka-server` es la excepcion, como en la Clase 17: conserva su configuracion local (puerto 8761 y que no se registre a si mismo), asi no depende del Config Server para arrancar.
+
+Para cambiar la configuracion se edita el repo de configuracion, se hace commit y push, y se reinician los servicios. No hace falta recompilar.
 
 ### Decisiones de diseno
 
@@ -73,12 +83,15 @@ En el proyecto de cada servicio solo queda el nombre y la direccion del Config S
 
 ```
 TP-Final-UTN/
-├── config-repo/        archivos de configuracion (los lee el Config Server)
+├── .github/workflows/  integracion continua (GitHub Actions)
 ├── config-server/
 ├── eureka-server/
 ├── product-service/
-└── customer-service/
+├── customer-service/
+└── postman/            coleccion con todos los pedidos
 ```
+
+La configuracion esta en su propio repositorio: [TP-Final-UTN-config](https://github.com/Gandara03/TP-Final-UTN-config).
 
 Los dos microservicios siguen la misma organizacion en capas que el TP de medio termino:
 
@@ -133,6 +146,8 @@ git clone https://github.com/Gandara03/TP-Final-UTN.git
 cd TP-Final-UTN
 ```
 
+El repo de configuracion no hace falta clonarlo: el Config Server lo lee directo desde GitHub.
+
 ### 2. Arrancar los servicios en orden
 
 El orden importa: primero la configuracion, despues el registro y al final los microservicios. Cada uno va en su propia terminal y hay que esperar a que muestre `Started ...Application` antes de pasar al siguiente.
@@ -166,23 +181,21 @@ En Linux o Mac es igual pero con `./mvnw spring-boot:run`. Tambien se pueden arr
 - Swagger de clientes: http://localhost:8081/swagger-ui.html
 - Swagger de productos: http://localhost:8082/swagger-ui.html
 
-### Probar con la configuracion local
+### Las tres verificaciones rapidas
 
-Por defecto el Config Server lee la configuracion de GitHub. Para usar la carpeta `config-repo` local (por ejemplo para probar un cambio sin hacer push):
-
-```powershell
-cd config-server
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=native"
-```
+1. http://localhost:8888/product-service/default: en `propertySources` tienen que aparecer `product-service.yml` y `application.yml`, con el repo de configuracion como origen.
+2. http://localhost:8761: tienen que figurar `CUSTOMER-SERVICE` y `PRODUCT-SERVICE` en UP.
+3. http://localhost:8082/productos/cliente/1: pegarle directo a product-service antes de probar Feign. Si este anda y `GET /clientes/1/productos` no, el problema esta en la comunicacion (Eureka o Feign), no en product-service.
 
 ### Problemas frecuentes
 
 | Sintoma | Causa y solucion |
 |---|---|
+| Un microservicio no arranca y dice `Could not locate PropertySource and the resource is not optional` | El Config Server no esta levantado. Arrancarlo primero y esperar el `Started ConfigServerApplication`. |
+| `/customer-service/default` da 200 pero en `propertySources` no aparece `customer-service.yml` | El nombre del archivo no coincide con `spring.application.name`, o el archivo todavia no tiene push en el repo de configuracion. |
+| `/customer-service/default` da 404 o el Config Server no arranca | La rama de `default-label` no existe (`main` contra `master`), el repo de configuracion es privado o no hay acceso a GitHub. |
 | `Access denied for user 'root'` al arrancar un microservicio | La password de MySQL no es `root`. Definir `DB_PASSWORD` (ver Variables de entorno) y abrir una terminal nueva. |
-| Un microservicio arranca en el puerto 8080 | No encontro al Config Server. Revisar que `config-server` este levantado antes. |
 | `GET /clientes/{id}/productos` devuelve 503 | `product-service` esta apagado o todavia no se registro en Eureka. Esperar unos segundos y reintentar. |
-| El Config Server no arranca o no encuentra la config | No tiene acceso a GitHub. Usar el perfil `native` de arriba. |
 
 ## Seguridad
 
@@ -215,7 +228,63 @@ Sin token la respuesta es 401, y con un rol que no alcanza es 403.
 | POST | `/clientes` | ADMIN | Registra un cliente |
 | PUT | `/clientes/{id}` | ADMIN | Actualiza un cliente |
 
-Ejemplo de alta:
+Ejemplos de pedido y respuesta:
+
+`POST /auth/login` con `{"username": "admin", "password": "admin123"}` responde **200**:
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "tipo": "Bearer",
+  "expiraEnSegundos": 3600,
+  "rol": "ADMIN"
+}
+```
+
+`GET /clientes/1` responde **200**:
+
+```json
+{
+  "id": 1,
+  "nombre": "Alexis",
+  "apellido": "Gandara",
+  "cuit": "20450703398",
+  "email": "alexis20143@gmail.com",
+  "saldo": 152300.50
+}
+```
+
+`GET /clientes/1/productos` (llama a product-service con Feign) responde **200**:
+
+```json
+{
+  "cliente": {
+    "id": 1,
+    "nombre": "Alexis",
+    "apellido": "Gandara",
+    "cuit": "20450703398",
+    "email": "alexis20143@gmail.com",
+    "saldo": 152300.50
+  },
+  "productos": [
+    { "id": 1, "tipo": "CUENTA", "numero": "0001-0001", "descripcion": "Caja de ahorro en pesos", "monto": 152300.50, "fechaAlta": "2026-11-18" },
+    { "id": 2, "tipo": "TARJETA", "numero": "4517-0001", "descripcion": "Visa Gold", "monto": 800000.00, "fechaAlta": "2026-11-18" },
+    { "id": 3, "tipo": "INVERSION", "numero": "PF-0001", "descripcion": "Plazo fijo 30 dias", "monto": 500000.00, "fechaAlta": "2026-11-18" }
+  ]
+}
+```
+
+Si product-service no esta disponible responde **503**:
+
+```json
+{
+  "status": 503,
+  "error": "No se pudieron obtener los productos del cliente 1: product-service no esta disponible",
+  "timestamp": "2026-11-18T20:25:10.412"
+}
+```
+
+`POST /clientes` (solo ADMIN) responde **201** con el cliente creado y su `id`. Pedido:
 
 ```json
 {
@@ -238,15 +307,29 @@ Ejemplo de alta:
 | PUT | `/productos/{id}` | Actualiza un producto |
 | DELETE | `/productos/{id}` | Baja logica |
 
-Ejemplo de alta:
+`POST /productos` con:
 
 ```json
 {
-  "clienteId": 1,
+  "clienteId": 2,
   "tipo": "TARJETA",
   "numero": "5412-0001",
   "descripcion": "Mastercard Black",
   "monto": 1500000
+}
+```
+
+responde **201**:
+
+```json
+{
+  "id": 7,
+  "clienteId": 2,
+  "tipo": "TARJETA",
+  "numero": "5412-0001",
+  "descripcion": "Mastercard Black",
+  "monto": 1500000,
+  "fechaAlta": "2026-11-18"
 }
 ```
 
@@ -261,6 +344,20 @@ Los dos servicios responden los errores con el mismo formato:
   "status": 404,
   "error": "No existe un cliente con id 99",
   "timestamp": "2026-11-16T10:15:30.123"
+}
+```
+
+Con datos invalidos, en `campos` viene el detalle de cada uno:
+
+```json
+{
+  "status": 400,
+  "error": "Datos invalidos",
+  "campos": {
+    "cuit": "El CUIT/CUIL debe tener 11 digitos, sin guiones",
+    "email": "El email no tiene un formato valido"
+  },
+  "timestamp": "2026-11-18T20:24:55.353"
 }
 ```
 
@@ -315,7 +412,7 @@ Lo que marco y que se hizo:
 |---|---|
 | Correr los tests de los dos microservicios | Se corrieron: 12 en product-service y 19 en customer-service, todos OK |
 | Probar el arranque completo en orden (Config Server, Eureka, microservicios) | Se probo con MySQL y la coleccion de Postman entera (24 pedidos OK) |
-| El Config Server lee de `main`, que tiene que tener `config-repo` | Se resuelve al mergear el pull request a `main` |
+| El Config Server lee de `main`, que tiene que tener la configuracion | La configuracion paso a su propio repo ([TP-Final-UTN-config](https://github.com/Gandara03/TP-Final-UTN-config)), con todo en `main` |
 | Cambiar credenciales de prueba y secreto JWT fuera de local | Ya se leen de variables de entorno; se aclaro en la seccion Seguridad |
 | Agregar un workflow de GitHub Actions | Se agrego `.github/workflows/ci.yml` (ver Integracion continua) |
 | Las rutas de product-service son publicas | Se dejo asi a proposito y se documento en Decisiones de diseno |

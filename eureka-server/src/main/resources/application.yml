@@ -1,6 +1,13 @@
+# Eureka conserva su configuracion local: no depende del Config Server para arrancar.
+server:
+  port: 8761
+
 spring:
   application:
     name: eureka-server
-  config:
-    # El resto de la configuracion (puerto, etc.) viene del Config Server.
-    import: "optional:configserver:http://localhost:8888"
+
+eureka:
+  client:
+    # Es el registro: no se registra a si mismo ni pide la lista de servicios.
+    register-with-eureka: false
+    fetch-registry: false
